@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strconv"
 	"sync"
+	"time"
 )
 
 //CSV format: https://cbonte.github.io/haproxy-dconv/configuration-1.5.html#9.1
@@ -137,7 +138,8 @@ func (g *haproxy) gatherServer(addr string, acc plugins.Accumulator) error {
 		return fmt.Errorf("Unable parse server address '%s': %s", addr, err)
 	}
 
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s://%s%s/;csv", u.Scheme, u.Host, u.Path), nil)
+	req, err := http.NewRequest("GET",
+		fmt.Sprintf("%s://%s%s/;csv", u.Scheme, u.Host, u.Path), nil)
 	if u.User != nil {
 		p, _ := u.User.Password()
 		req.SetBasicAuth(u.User.Username(), p)
@@ -152,160 +154,158 @@ func (g *haproxy) gatherServer(addr string, acc plugins.Accumulator) error {
 		return fmt.Errorf("Unable to get valid stat result from '%s': %s", addr, err)
 	}
 
-	importCsvResult(res.Body, acc, u.Host)
-
-	return nil
+	return importCsvResult(res.Body, acc, u.Host)
 }
 
-func importCsvResult(r io.Reader, acc plugins.Accumulator, host string) ([][]string, error) {
+func importCsvResult(r io.Reader, acc plugins.Accumulator, host string) error {
 	csv := csv.NewReader(r)
 	result, err := csv.ReadAll()
+	now := time.Now()
 
 	for _, row := range result {
-
+		fields := make(map[string]interface{})
+		tags := map[string]string{
+			"server": host,
+			"proxy":  row[HF_PXNAME],
+			"sv":     row[HF_SVNAME],
+		}
 		for field, v := range row {
-			tags := map[string]string{
-				"server": host,
-				"proxy":  row[HF_PXNAME],
-				"sv":     row[HF_SVNAME],
-			}
 			switch field {
 			case HF_QCUR:
 				ival, err := strconv.ParseUint(v, 10, 64)
 				if err == nil {
-					acc.Add("qcur", ival, tags)
+					fields["qcur"] = ival
 				}
 			case HF_QMAX:
 				ival, err := strconv.ParseUint(v, 10, 64)
 				if err == nil {
-					acc.Add("qmax", ival, tags)
+					fields["qmax"] = ival
 				}
 			case HF_SCUR:
 				ival, err := strconv.ParseUint(v, 10, 64)
 				if err == nil {
-					acc.Add("scur", ival, tags)
+					fields["scur"] = ival
 				}
 			case HF_SMAX:
 				ival, err := strconv.ParseUint(v, 10, 64)
 				if err == nil {
-					acc.Add("smax", ival, tags)
+					fields["smax"] = ival
 				}
 			case HF_BIN:
 				ival, err := strconv.ParseUint(v, 10, 64)
 				if err == nil {
-					acc.Add("bin", ival, tags)
+					fields["bin"] = ival
 				}
 			case HF_BOUT:
 				ival, err := strconv.ParseUint(v, 10, 64)
 				if err == nil {
-					acc.Add("bout", ival, tags)
+					fields["bout"] = ival
 				}
 			case HF_DREQ:
 				ival, err := strconv.ParseUint(v, 10, 64)
 				if err == nil {
-					acc.Add("dreq", ival, tags)
+					fields["dreq"] = ival
 				}
 			case HF_DRESP:
 				ival, err := strconv.ParseUint(v, 10, 64)
 				if err == nil {
-					acc.Add("dresp", ival, tags)
+					fields["dresp"] = ival
 				}
 			case HF_RATE:
 				ival, err := strconv.ParseUint(v, 10, 64)
 				if err == nil {
-					acc.Add("rate", ival, tags)
+					fields["rate"] = ival
 				}
 			case HF_RATE_MAX:
 				ival, err := strconv.ParseUint(v, 10, 64)
 				if err == nil {
-					acc.Add("rate_max", ival, tags)
+					fields["rate_max"] = ival
 				}
 			case HF_STOT:
 				ival, err := strconv.ParseUint(v, 10, 64)
 				if err == nil {
-					acc.Add("stot", ival, tags)
+					fields["stot"] = ival
 				}
 			case HF_HRSP_1xx:
 				ival, err := strconv.ParseUint(v, 10, 64)
 				if err == nil {
-					acc.Add("http_response.1xx", ival, tags)
+					fields["http_response.1xx"] = ival
 				}
 			case HF_HRSP_2xx:
 				ival, err := strconv.ParseUint(v, 10, 64)
 				if err == nil {
-					acc.Add("http_response.2xx", ival, tags)
+					fields["http_response.2xx"] = ival
 				}
 			case HF_HRSP_3xx:
 				ival, err := strconv.ParseUint(v, 10, 64)
 				if err == nil {
-					acc.Add("http_response.3xx", ival, tags)
+					fields["http_response.3xx"] = ival
 				}
 			case HF_HRSP_4xx:
 				ival, err := strconv.ParseUint(v, 10, 64)
 				if err == nil {
-					acc.Add("http_response.4xx", ival, tags)
+					fields["http_response.4xx"] = ival
 				}
 			case HF_HRSP_5xx:
 				ival, err := strconv.ParseUint(v, 10, 64)
 				if err == nil {
-					acc.Add("http_response.5xx", ival, tags)
+					fields["http_response.5xx"] = ival
 				}
 			case HF_EREQ:
 				ival, err := strconv.ParseUint(v, 10, 64)
 				if err == nil {
-					acc.Add("ereq", ival, tags)
+					fields["ereq"] = ival
 				}
 			case HF_ERESP:
 				ival, err := strconv.ParseUint(v, 10, 64)
 				if err == nil {
-					acc.Add("eresp", ival, tags)
+					fields["eresp"] = ival
 				}
 			case HF_ECON:
 				ival, err := strconv.ParseUint(v, 10, 64)
 				if err == nil {
-					acc.Add("econ", ival, tags)
+					fields["econ"] = ival
 				}
 			case HF_WRETR:
 				ival, err := strconv.ParseUint(v, 10, 64)
 				if err == nil {
-					acc.Add("wretr", ival, tags)
+					fields["wretr"] = ival
 				}
 			case HF_WREDIS:
 				ival, err := strconv.ParseUint(v, 10, 64)
 				if err == nil {
-					acc.Add("wredis", ival, tags)
+					fields["wredis"] = ival
 				}
 			case HF_REQ_RATE:
 				ival, err := strconv.ParseUint(v, 10, 64)
 				if err == nil {
-					acc.Add("req_rate", ival, tags)
+					fields["req_rate"] = ival
 				}
 			case HF_REQ_RATE_MAX:
 				ival, err := strconv.ParseUint(v, 10, 64)
 				if err == nil {
-					acc.Add("req_rate_max", ival, tags)
+					fields["req_rate_max"] = ival
 				}
 			case HF_REQ_TOT:
 				ival, err := strconv.ParseUint(v, 10, 64)
 				if err == nil {
-					acc.Add("req_tot", ival, tags)
+					fields["req_tot"] = ival
 				}
 			case HF_THROTTLE:
 				ival, err := strconv.ParseUint(v, 10, 64)
 				if err == nil {
-					acc.Add("throttle", ival, tags)
+					fields["throttle"] = ival
 				}
 			case HF_LBTOT:
 				ival, err := strconv.ParseUint(v, 10, 64)
 				if err == nil {
-					acc.Add("lbtot", ival, tags)
+					fields["lbtot"] = ival
 				}
-
 			}
-
 		}
+		acc.AddFields("haproxy", fields, tags, now)
 	}
-	return result, err
+	return err
 }
 
 func init() {
